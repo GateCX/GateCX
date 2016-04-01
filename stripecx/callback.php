@@ -133,6 +133,45 @@ if (isset($_REQUEST['id']) && !empty($_REQUEST['id'])) {
 	$fail_desc = $event_json->data->object->failure_message;
 	$fee = (($amount * 0.029) + 0.30);
 	
+	/* Has the currency been converted for processing? Let's find out. */
+	// Get User ID
+	$sql = "SELECT userid FROM tblaccounts WHERE transid = '$transid'";
+	$result = $pdo->query($sql);
+	$row = $result->fetch(PDO::FETCH_ASSOC);
+	
+	$uid = $row['userid'];
+	
+	// What's user's default currency?
+	$sql = "SELECT currency FROM tblclients WHERE id = '$uid'";
+	$result = $pdo->query($sql);
+	$row = $result->fetch(PDO::FETCH_ASSOC);
+	
+	$ccurid = $row['currency'];
+	
+	// Translate user's currency (ccurid) to ISO
+	$sql = "SELECT code FROM tblcurrencies WHERE id = '$ccurid'";
+	$result = $pdo->query($sql);
+	$row = $result->fetch(PDO::FETCH_ASSOC);
+	
+	$ccuriso = $row['code'];
+
+	// If the payment has been processed in a differente currency,
+	// convert it back to client's
+	if (strcasecmp($currency, $ccuriso) != 0) {
+		$sql = "SELECT rate FROM tblcurrencies WHERE code = '$currency'";
+		$result = $pdo->query($sql);
+		$row = $result->fetch(PDO::FETCH_ASSOC);
+		
+		$exrate = $row['rate'];
+		
+		// Get the inverse rate -- that's what we need.
+		$defrate = 1 / $exrate;
+		
+		$amount *= $defrate;
+		$fee = (($amount * 0.029) + (0.30 * $defrate));
+	}
+
+	
 	//Get invoice id from database
 	$sql = "SELECT * FROM stripecx_transactions WHERE transaction_id = '$transid'";
 	$result = $pdo->query($sql);
